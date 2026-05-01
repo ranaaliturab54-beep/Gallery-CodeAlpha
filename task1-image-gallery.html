@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Luminary Gallery</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #141414;
+    --border: #222;
+    --accent: #c8a96e;
+    --accent2: #e8c99e;
+    --text: #f0ece4;
+    --muted: #888;
+    --overlay: rgba(10,10,10,0.92);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grain overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.5;
+  }
+
+  header {
+    padding: 3rem 4rem 2rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 2rem;
+    flex-wrap: wrap;
+  }
+
+  .logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 2.2rem;
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+
+  .logo span { color: var(--accent); font-style: italic; }
+
+  .subtitle {
+    font-size: 0.75rem;
+    color: var(--muted);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-top: 0.4rem;
+  }
+
+  /* Filter tabs */
+  .filters {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .filter-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 0.5rem 1.2rem;
+    border-radius: 2rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    text-transform: uppercase;
+  }
+
+  .filter-btn:hover { color: var(--text); border-color: var(--accent); }
+  .filter-btn.active { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 500; }
+
+  /* Gallery grid */
+  .gallery-wrap {
+    padding: 3rem 4rem;
+  }
+
+  .gallery {
+    columns: 3;
+    column-gap: 1.2rem;
+  }
+
+  @media (max-width: 900px) { .gallery { columns: 2; } header { padding: 2rem; } .gallery-wrap { padding: 2rem; } }
+  @media (max-width: 560px) { .gallery { columns: 1; } }
+
+  .gallery-item {
+    break-inside: avoid;
+    margin-bottom: 1.2rem;
+    position: relative;
+    cursor: pointer;
+    overflow: hidden;
+    border-radius: 4px;
+    transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .gallery-item.hidden {
+    display: none;
+  }
+
+  .gallery-item:hover { transform: scale(1.02); }
+
+  .gallery-item img {
+    width: 100%;
+    display: block;
+    transition: filter 0.4s ease;
+    border-radius: 4px;
+  }
+
+  .gallery-item:hover img { filter: brightness(0.7); }
+
+  .item-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 1.5rem;
+    background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 60%);
+    opacity: 0;
+    transition: opacity 0.35s ease;
+    border-radius: 4px;
+  }
+
+  .gallery-item:hover .item-overlay { opacity: 1; }
+
+  .item-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem;
+    color: #fff;
+    margin-bottom: 0.25rem;
+  }
+
+  .item-cat {
+    font-size: 0.7rem;
+    color: var(--accent);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  .expand-icon {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: rgba(200,169,110,0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .gallery-item:hover .expand-icon { opacity: 1; }
+  .expand-icon svg { width: 14px; height: 14px; fill: #000; }
+
+  /* Lightbox */
+  .lightbox {
+    position: fixed;
+    inset: 0;
+    background: var(--overlay);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.35s ease;
+    backdrop-filter: blur(12px);
+  }
+
+  .lightbox.open { opacity: 1; pointer-events: all; }
+
+  .lightbox-inner {
+    position: relative;
+    max-width: 85vw;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+  }
+
+  .lightbox-img-wrap {
+    position: relative;
+    overflow: hidden;
+    border-radius: 6px;
+    box-shadow: 0 40px 80px rgba(0,0,0,0.6);
+  }
+
+  .lightbox img {
+    max-width: 80vw;
+    max-height: 75vh;
+    object-fit: contain;
+    display: block;
+    border-radius: 6px;
+    transition: opacity 0.25s ease;
+  }
+
+  .lightbox-info {
+    text-align: center;
+  }
+
+  .lightbox-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.4rem;
+    margin-bottom: 0.3rem;
+  }
+
+  .lightbox-cat {
+    font-size: 0.72rem;
+    color: var(--accent);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  .lightbox-counter {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-top: 0.3rem;
+  }
+
+  /* Nav buttons */
+  .lb-btn {
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: var(--text);
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    font-size: 1.2rem;
+    z-index: 1001;
+  }
+
+  .lb-btn:hover { background: var(--accent); border-color: var(--accent); color: #000; }
+  .lb-btn.prev { left: 2rem; }
+  .lb-btn.next { right: 2rem; }
+
+  .lb-close {
+    position: fixed;
+    top: 1.5rem;
+    right: 2rem;
+    background: none;
+    border: 1px solid rgba(255,255,255,0.15);
+    color: var(--text);
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.2rem;
+    z-index: 1001;
+    transition: all 0.25s;
+  }
+
+  .lb-close:hover { background: #fff; color: #000; border-color: #fff; }
+
+  /* Count badge */
+  .gallery-count {
+    font-size: 0.75rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0 4rem 1.5rem;
+  }
+
+  .gallery-count span { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">Luminary <span>Gallery</span></div>
+    <div class="subtitle">A curated visual experience</div>
+  </div>
+  <div class="filters">
+    <button class="filter-btn active" data-filter="all">All</button>
+    <button class="filter-btn" data-filter="nature">Nature</button>
+    <button class="filter-btn" data-filter="architecture">Architecture</button>
+    <button class="filter-btn" data-filter="abstract">Abstract</button>
+    <button class="filter-btn" data-filter="travel">Travel</button>
+  </div>
+</header>
+
+<div class="gallery-count"><span id="count">12</span> works</div>
+
+<div class="gallery-wrap">
+  <div class="gallery" id="gallery">
+  </div>
+</div>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox">
+  <button class="lb-close" id="lbClose">✕</button>
+  <button class="lb-btn prev" id="lbPrev">&#8592;</button>
+  <button class="lb-btn next" id="lbNext">&#8594;</button>
+  <div class="lightbox-inner">
+    <div class="lightbox-img-wrap">
+      <img id="lbImg" src="" alt="">
+    </div>
+    <div class="lightbox-info">
+      <div class="lightbox-title" id="lbTitle"></div>
+      <div class="lightbox-cat" id="lbCat"></div>
+      <div class="lightbox-counter" id="lbCounter"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const images = [
+  { src: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800', title: 'Alpine Serenity', cat: 'nature' },
+  { src: 'https://images.unsplash.com/photo-1486325212027-8081e485255e?w=800', title: 'Steel & Glass', cat: 'architecture' },
+  { src: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800', title: 'Chromatic Drift', cat: 'abstract' },
+  { src: 'https://images.unsplash.com/photo-1539635278303-d4002c07eae3?w=800', title: 'Santorini Dusk', cat: 'travel' },
+  { src: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=800', title: 'Forest Light', cat: 'nature' },
+  { src: 'https://images.unsplash.com/photo-1555636222-cae831e670b3?w=800', title: 'Urban Geometry', cat: 'architecture' },
+  { src: 'https://images.unsplash.com/photo-1525909002-1b05e0c869d8?w=800', title: 'Liquid Motion', cat: 'abstract' },
+  { src: 'https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?w=800', title: 'City at Dawn', cat: 'travel' },
+  { src: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800', title: 'Ocean Mist', cat: 'nature' },
+  { src: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800', title: 'Mountain Bloom', cat: 'nature' },
+  { src: 'https://images.unsplash.com/photo-1518005020951-eccb494ad742?w=800', title: 'The Arches', cat: 'architecture' },
+  { src: 'https://images.unsplash.com/photo-1531306728370-e2ebd9d7bb99?w=800', title: 'Neon Pulse', cat: 'abstract' },
+];
+
+let activeFilter = 'all';
+let currentIndex = 0;
+let visibleImages = [];
+
+const gallery = document.getElementById('gallery');
+const lightbox = document.getElementById('lightbox');
+const lbImg = document.getElementById('lbImg');
+const lbTitle = document.getElementById('lbTitle');
+const lbCat = document.getElementById('lbCat');
+const lbCounter = document.getElementById('lbCounter');
+const countEl = document.getElementById('count');
+
+function buildGallery() {
+  gallery.innerHTML = '';
+  visibleImages = images.filter(img => activeFilter === 'all' || img.cat === activeFilter);
+  countEl.textContent = visibleImages.length;
+
+  visibleImages.forEach((img, i) => {
+    const item = document.createElement('div');
+    item.className = 'gallery-item';
+    item.innerHTML = `
+      <img src="${img.src}" alt="${img.title}" loading="lazy">
+      <div class="item-overlay">
+        <div class="item-title">${img.title}</div>
+        <div class="item-cat">${img.cat}</div>
+      </div>
+      <div class="expand-icon">
+        <svg viewBox="0 0 24 24"><path d="M3 3h7v2H5v5H3V3zm11 0h7v7h-2V5h-5V3zM3 14h2v5h5v2H3v-7zm16 5h-5v2h7v-7h-2v5z"/></svg>
+      </div>
+    `;
+    item.addEventListener('click', () => openLightbox(i));
+    gallery.appendChild(item);
+  });
+}
+
+function openLightbox(index) {
+  currentIndex = index;
+  updateLightbox();
+  lightbox.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeLightbox() {
+  lightbox.classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function updateLightbox() {
+  const img = visibleImages[currentIndex];
+  lbImg.style.opacity = '0';
+  setTimeout(() => {
+    lbImg.src = img.src;
+    lbImg.onload = () => lbImg.style.opacity = '1';
+    lbTitle.textContent = img.title;
+    lbCat.textContent = img.cat;
+    lbCounter.textContent = `${currentIndex + 1} / ${visibleImages.length}`;
+  }, 150);
+}
+
+document.getElementById('lbClose').addEventListener('click', closeLightbox);
+document.getElementById('lbPrev').addEventListener('click', () => {
+  currentIndex = (currentIndex - 1 + visibleImages.length) % visibleImages.length;
+  updateLightbox();
+});
+document.getElementById('lbNext').addEventListener('click', () => {
+  currentIndex = (currentIndex + 1) % visibleImages.length;
+  updateLightbox();
+});
+
+lightbox.addEventListener('click', e => { if (e.target === lightbox) closeLightbox(); });
+
+document.addEventListener('keydown', e => {
+  if (!lightbox.classList.contains('open')) return;
+  if (e.key === 'ArrowLeft') { currentIndex = (currentIndex - 1 + visibleImages.length) % visibleImages.length; updateLightbox(); }
+  if (e.key === 'ArrowRight') { currentIndex = (currentIndex + 1) % visibleImages.length; updateLightbox(); }
+  if (e.key === 'Escape') closeLightbox();
+});
+
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelector('.filter-btn.active').classList.remove('active');
+    btn.classList.add('active');
+    activeFilter = btn.dataset.filter;
+    buildGallery();
+  });
+});
+
+buildGallery();
+</script>
+</body>
+</html>
